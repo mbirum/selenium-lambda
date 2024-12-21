@@ -1,0 +1,12 @@
+version: 0.2
+
+phases:	
+  install:	
+    runtime-versions:	
+      # For information on available runtime-versions:	
+      # https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-available.html	
+      docker: 18
+
+  build:
+    commands:
+      - echo "Running Application Validation"

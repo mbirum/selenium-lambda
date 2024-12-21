@@ -1,0 +1,14 @@
+{
+    "Parameters": {
+      "pTimeStamp": { "Fn::GetParam" : ["Build", "timestamp.json", "timestamp"]},
+      "pLambdaFunctionName": "NRThreadProfileTrigger",
+      "pCodepipelineArtifactBucket": "pipeline-artifact-120638066983-us-east-2",
+      "pProduct": "NRThreadProfile",
+      "pResourceOwner": "conovm2@nationwide.com",
+      "pBusinessUnit":"CDT01",
+      "pDisbursementCode": "303513001",
+      "pAPRMID": "9397",
+      "pEnvironment": "TestCDT01",
+      "pEventName": "TestCDT01-us-east-2-StartNewRelicThreadProfile"
+    }
+}

@@ -1,0 +1,39 @@
+# Specific Files/Libraries #
+############################
+venv
+venv-win
+secrets.yaml
+*.xlsx
+*.csv
+*.twb
+*.side
+__pycache__
+
+# Compiled source #
+###################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Packages #
+############
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+
+# Logs and databases #
+######################
+*.log
+*.sql
+*.sqlite
+
+### VS Code ###
+###############
+.vscode/

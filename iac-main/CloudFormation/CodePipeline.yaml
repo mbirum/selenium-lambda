@@ -1,0 +1,421 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Builds a basic pipeline for serverless application
+
+Parameters:
+# ----------- Product Info ----------- #
+  pProduct:
+    Type: String
+    Description: Product Name
+    Default: ""
+  pBusinessUnit:
+    Type: String
+    Description: Business Unit Name
+    Default: ""
+  pRootDir:
+    Type: String
+    Description: Root Directory (iac) for the project
+    Default: iac
+  pAPRMID:
+    Type: String
+    Default: Application id, used to create/manage RFCs
+
+# ----------- Environmental Info ----------- #
+  pSharedProdAccountNumber:
+    Type: String
+    Description: SharedProd Account Number
+    Default: ""
+  pToolsAccountNumber:
+    Type: String
+    Description: Tools Account Number
+    Default: ""
+  pProdAccountNumber:
+    Type: String
+    Description: Production Account Number
+    Default: ""
+  pTestAccountNumber:
+    Type: String
+    Description: Test Account Number
+    Default: ""
+  pDevAccountNumber:
+    Type: String
+    Description: Development Account Number
+    Default: ""
+
+# ----------- IAM Roles Info ----------- #
+  pCodePipelineServiceRole:
+    Type: String
+    Description: Codepipeline Service Role
+    Default: ""
+  pCodePipelineActionRole:
+    Type: String
+    Description: Cloudformation Action Role
+    Default: ""
+  pCodePipelineSharedProdActionRole:
+    Type: String
+    Description: Cloudformation Shared Prod Action Role
+    Default: ""
+
+# ----------- SNOW Info ----------- #
+  pResourceOwner:
+    Type: String
+    Description: Resource owner of the product
+    Default: ""
+  pDisbursementCode:
+    Type: String
+    Description: Billing code for the product
+    Default: ""
+
+Resources:
+  rApprovalSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub ${pProduct}-${pBusinessUnit}-Deployment-Approval
+      TopicName: !Sub ${pProduct}-${pBusinessUnit}-Deployment-Approval
+      Tags:
+        - Key: ResourceOwner
+          Value: !Ref pResourceOwner
+        - Key: APRMID
+          Value: !Ref pAPRMID
+        - Key: DisbursementCode
+          Value: !Ref pDisbursementCode
+        - Key: ResourceName
+          Value: !Ref pProduct
+
+  rPipelineEventRuleSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub ${pProduct}-${pBusinessUnit}-Pipeline-Notification
+      TopicName: !Sub ${pProduct}-${pBusinessUnit}-Pipeline-Notification
+      Tags:
+        - Key: ResourceOwner
+          Value: !Ref pResourceOwner
+        - Key: APRMID
+          Value: !Ref pAPRMID
+        - Key: DisbursementCode
+          Value: !Ref pDisbursementCode
+        - Key: ResourceName
+          Value: !Ref pProduct
+
+  rCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        EncryptionKey:
+          Id: "{{resolve:ssm:PipelineKmsKey:1}}"
+          Type: KMS
+        Location: "{{resolve:ssm:PipelineArtifactBucket:1}}"
+        Type: S3
+      Name: !Sub ${pProduct}-${pBusinessUnit}
+      RoleArn: !Sub arn:aws:iam::${pToolsAccountNumber}:role/${pCodePipelineServiceRole}
+      Stages:
+        - Name: Source
+          Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                S3Bucket: "{{resolve:ssm:PipelineSourceBucket:1}}"
+                S3ObjectKey: !Sub ${pProduct}-${pBusinessUnit}/deploy.zip
+                PollForSourceChanges: false
+              Name: Application_Source
+              OutputArtifacts:
+                - Name: Source
+              RunOrder: 1
+            - ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                S3Bucket: "{{resolve:ssm:PipelineSourceBucket:1}}"
+                S3ObjectKey: !Sub ${pProduct}-${pBusinessUnit}/secret.zip
+                PollForSourceChanges: false
+              Name: Secrets_Source
+              OutputArtifacts:
+                - Name: SecretsSource
+              RunOrder: 2
+
+        - Name: BuildAndPackage
+          Actions:
+            - Name: Update_CodePipeline
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Provider: Lambda
+                Version: '1'
+              Configuration:
+                FunctionName: update-codepipeline
+                UserParameters: !Sub |
+                  {
+                    "cfn_template": "${pRootDir}/CloudFormation/CodePipeline.yaml",
+                    "cfn_parameter": "${pRootDir}/CloudFormation/CodePipeline.json",
+                    "stack_name": "${pProduct}-${pBusinessUnit}-CodePipeline-${AWS::Region}",
+                    "account": "${pToolsAccountNumber}"
+                  }
+              InputArtifacts:
+                - Name: Source
+              OutputArtifacts: []
+              RoleArn: !Sub arn:aws:iam::${pSharedProdAccountNumber}:role/${pCodePipelineSharedProdActionRole}
+              RunOrder: 1
+            - Name: Application_Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Sub ${pProduct}-${pBusinessUnit}-Serverless-${AWS::Region}
+              InputArtifacts:
+                - Name: Source
+              OutputArtifacts:
+                - Name: Build
+              RunOrder: 2
+
+        - Name: !Sub Dev${pBusinessUnit}
+          Actions:
+            - Name: Deploy_Secrets
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: REPLACE_ON_FAILURE
+                Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !Sub arn:aws:iam::${pDevAccountNumber}:role/${pCodePipelineActionRole}
+                StackName: !Sub ${pProduct}-Secret-Dev${pBusinessUnit}
+                TemplateConfiguration: !Sub SecretsSource::${pRootDir}/CloudFormation/Secret-Dev${pBusinessUnit}.json
+                TemplatePath: !Sub Source::${pRootDir}/CloudFormation/Secret.yaml
+              InputArtifacts:
+                - Name: SecretsSource
+                - Name: Source
+              OutputArtifacts: []
+              RoleArn: !Sub arn:aws:iam::${pDevAccountNumber}:role/${pCodePipelineActionRole}
+              RunOrder: 1
+            - Name: Deploy_Lambda
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !Sub arn:aws:iam::${pDevAccountNumber}:role/${pCodePipelineActionRole}
+                StackName: !Sub ${pProduct}-Lambda-Dev${pBusinessUnit}
+                TemplatePath: !Sub Source::${pRootDir}/CloudFormation/Lambda.yaml
+                TemplateConfiguration: !Sub Source::${pRootDir}/CloudFormation/Lambda-Dev${pBusinessUnit}.json
+                OutputFileName: !Sub Dev${pBusinessUnit}Lambda.json
+              InputArtifacts:
+                - Name: Source
+                - Name: Build
+              OutputArtifacts:
+                - Name: !Sub Dev${pBusinessUnit}Lambda
+              RoleArn: !Sub arn:aws:iam::${pDevAccountNumber}:role/${pCodePipelineActionRole}
+              RunOrder: 2
+            - Name: Application_Validation
+              ActionTypeId:
+                Category: Test
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Sub ${pProduct}-${pBusinessUnit}-AppValidate-${AWS::Region}
+              InputArtifacts:
+                - Name: Source
+              RoleArn: !Sub arn:aws:iam::${pDevAccountNumber}:role/${pCodePipelineActionRole}
+              RunOrder: 3
+
+        - Name: !Sub Dev${pBusinessUnit}_Approval
+          Actions:
+            - Name: DevelopmentApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                NotificationArn: !Ref rApprovalSNSTopic
+              InputArtifacts: []
+              RoleArn: !Sub arn:aws:iam::${AWS::AccountId}:role/${pCodePipelineActionRole}
+              RunOrder: 1
+
+        - Name: !Sub Test${pBusinessUnit}
+          Actions:
+            - Name: Deploy_Secrets
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: REPLACE_ON_FAILURE
+                Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !Sub arn:aws:iam::${pTestAccountNumber}:role/${pCodePipelineActionRole}
+                StackName: !Sub ${pProduct}-Secret-Test${pBusinessUnit}
+                TemplateConfiguration: !Sub SecretsSource::${pRootDir}/CloudFormation/Secret-Test${pBusinessUnit}.json
+                TemplatePath: !Sub Source::${pRootDir}/CloudFormation/Secret.yaml
+              InputArtifacts:
+                - Name: SecretsSource
+                - Name: Source
+              OutputArtifacts: []
+              RoleArn: !Sub arn:aws:iam::${pTestAccountNumber}:role/${pCodePipelineActionRole}
+              RunOrder: 1
+            - Name: Deploy_Lambda
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !Sub arn:aws:iam::${pTestAccountNumber}:role/${pCodePipelineActionRole}
+                StackName: !Sub ${pProduct}-Lambda-Test${pBusinessUnit}
+                TemplatePath: !Sub Source::${pRootDir}/CloudFormation/Lambda.yaml
+                TemplateConfiguration: !Sub Source::${pRootDir}/CloudFormation/Lambda-Test${pBusinessUnit}.json
+                OutputFileName: !Sub Test${pBusinessUnit}Lambda.json
+              InputArtifacts:
+                - Name: Source
+                - Name: Build
+              OutputArtifacts:
+                - Name: !Sub Test${pBusinessUnit}Lambda
+              RoleArn: !Sub arn:aws:iam::${pTestAccountNumber}:role/${pCodePipelineActionRole}
+              RunOrder: 2
+            - Name: Application_Validation
+              ActionTypeId:
+                Category: Test
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Sub ${pProduct}-${pBusinessUnit}-AppValidate-${AWS::Region}
+              InputArtifacts:
+                - Name: Source
+              RoleArn: !Sub arn:aws:iam::${pTestAccountNumber}:role/${pCodePipelineActionRole}
+              RunOrder: 3
+
+        - Name: !Sub Test${pBusinessUnit}_Approval
+          Actions:
+            - Name: TestApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                NotificationArn: !Ref rApprovalSNSTopic
+              InputArtifacts: []
+              RoleArn: !Sub arn:aws:iam::${AWS::AccountId}:role/${pCodePipelineActionRole}
+              RunOrder: 1
+
+        - Name: ServiceNow
+          Actions:
+            - Name: Create_Or_Update_CI
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Provider: Lambda
+                Version: '1'
+              Configuration:
+                FunctionName: servicenow-resource-test
+                UserParameters: !Sub '{"Account": "${AWS::AccountId}", "ci_name": "${pProduct}", "aprm_id":"${pAPRMID}", "resource_owner": "${pResourceOwner}", "disbursement_code": "${pDisbursementCode}"}'
+              InputArtifacts:
+                - Name: Source
+              OutputArtifacts: []
+              RoleArn: !Sub arn:aws:iam::${pSharedProdAccountNumber}:role/${pCodePipelineSharedProdActionRole}
+              RunOrder: 1
+            - Name: Create_RFC
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Provider: Lambda
+                Version: '1'
+              Configuration:
+                FunctionName: servicenow-change-test
+                UserParameters: !Sub '{"Account": "${AWS::AccountId}", "Action": "create", "ci_name": "${pProduct}", "resource_owner": "${pResourceOwner}", "disbursement_code": "${pDisbursementCode}", "auto_advance": "True"}'
+              OutputArtifacts:
+                - Name: ServiceNowRFC
+              RoleArn: !Sub arn:aws:iam::${pSharedProdAccountNumber}:role/${pCodePipelineSharedProdActionRole}
+              RunOrder: 2
+
+        - Name: !Sub Prod${pBusinessUnit}
+          Actions:
+            - Name: Deploy_Secrets
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: REPLACE_ON_FAILURE
+                Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !Sub arn:aws:iam::${pProdAccountNumber}:role/${pCodePipelineActionRole}
+                StackName: !Sub ${pProduct}-Secret-Prod${pBusinessUnit}
+                TemplateConfiguration: !Sub SecretsSource::${pRootDir}/CloudFormation/Secret-Prod${pBusinessUnit}.json
+                TemplatePath: !Sub Source::${pRootDir}/CloudFormation/Secret.yaml
+              InputArtifacts:
+                - Name: SecretsSource
+                - Name: Source
+              OutputArtifacts: []
+              RoleArn: !Sub arn:aws:iam::${pProdAccountNumber}:role/${pCodePipelineActionRole}
+              RunOrder: 1
+            - Name: Deploy_Lambda
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !Sub arn:aws:iam::${pProdAccountNumber}:role/${pCodePipelineActionRole}
+                StackName: !Sub ${pProduct}-Lambda-Prod${pBusinessUnit}
+                TemplatePath: !Sub Source::${pRootDir}/CloudFormation/Lambda.yaml
+                TemplateConfiguration: !Sub Source::${pRootDir}/CloudFormation/Lambda-Prod${pBusinessUnit}.json
+                OutputFileName: !Sub Prod${pBusinessUnit}Lambda.json
+              InputArtifacts:
+                - Name: Source
+                - Name: Build
+              OutputArtifacts:
+                - Name: !Sub Prod${pBusinessUnit}Lambda
+              RoleArn: !Sub arn:aws:iam::${pProdAccountNumber}:role/${pCodePipelineActionRole}
+              RunOrder: 2
+            - Name: Application_Validation
+              ActionTypeId:
+                Category: Test
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Sub ${pProduct}-${pBusinessUnit}-AppValidate-${AWS::Region}
+              InputArtifacts:
+                - Name: Source
+              RoleArn: !Sub arn:aws:iam::${pProdAccountNumber}:role/${pCodePipelineActionRole}
+              RunOrder: 3
+
+        - Name: ServiceNowProd
+          Actions:
+            - Name: Close_RFC
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Provider: Lambda
+                Version: '1'
+              Configuration:
+                FunctionName: servicenow-change-test
+                UserParameters: !Sub '{"Account": "${AWS::AccountId}", "Action": "close"}'
+              InputArtifacts:
+                - Name: ServiceNowRFC
+              RoleArn: !Sub arn:aws:iam::${pSharedProdAccountNumber}:role/${pCodePipelineSharedProdActionRole}
+              RunOrder: 1
+
+Outputs:
+  oCodePipeline:
+    Value: !Ref rCodePipeline
+  oApprovalSNSTopic:
+    Value: !Ref rApprovalSNSTopic
+  oPipelineEventRuleSNSTopic:
+    Value: !Ref rPipelineEventRuleSNSTopic

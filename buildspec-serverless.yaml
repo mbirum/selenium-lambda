@@ -1,0 +1,68 @@
+version: 0.1
+
+phases:
+  install: # INSTALL PHASE - install any tools needed for build
+    commands:
+      - echo "nothing to do in install"
+  pre_build: # PRE-BUILD PHASE - download dependencies here
+    commands:
+      - echo "downloading dependencies"
+      - |
+        directory=$PWD
+        cd $directory/NRThreadProfileTriggerApp/src;
+        pip install -r requirements.txt --target .
+        python --version
+        pip --version
+  build: # BUILD PHASE - compile/package for compiled languages, bundle for non-compiled, upload to s3
+    commands:
+      - echo "Build stage"
+      - |
+        timestamp=$(date +%Y%m%d%H%M)
+        echo "{\"timestamp\":\"${timestamp}\"}" > /tmp/timestamp.json
+        directory=$PWD
+
+        #copy all iac files to bucket
+        aws s3 cp $directory/iac-main s3://$TEMPLATE_BUCKET/$PIPELINE_NAME/iac-main/ --recursive \
+        --sse aws:kms \
+        --sse-kms-key-id $KMS_ARN
+
+        # Zip up the lambda code
+        echo "Building zip for NRThreadProfileTriggerApp/src directory"
+        cd $directory/NRThreadProfileTriggerApp/src;
+        zip -r $directory/NRThreadProfileTriggerApp/src/deploy-${timestamp}.zip *
+        aws s3 cp $directory/NRThreadProfileTriggerApp/src/deploy-${timestamp}.zip s3://$TEMPLATE_BUCKET/$PIPELINE_NAME/src/ \
+        --sse aws:kms \
+        --sse-kms-key-id $KMS_ARN
+
+        # Zip up SeleniumChromiumLayer packages
+        echo "Building Selenium & Chromium binary zip for layer"
+        cd $directory
+        rm -f layer.zip
+        mkdir layer layer/python
+        curl -SL https://github.com/adieuadieu/serverless-chrome/releases/download/v1.0.0-55/stable-headless-chromium-amazonlinux-2017-03.zip > headless-chromium.zip
+        unzip -u headless-chromium.zip -d $directory/layer/python
+        rm headless-chromium.zip
+        curl -SL https://chromedriver.storage.googleapis.com/2.43/chromedriver_linux64.zip > chromedriver.zip
+        unzip -u chromedriver.zip -d $directory/layer/python
+        rm chromedriver.zip
+        cd layer; zip -9qr layer.zip .; cd $directory
+        cp layer/layer.zip .
+        rm -rf layer
+        aws s3 cp $directory/layer.zip s3://$TEMPLATE_BUCKET/$PIPELINE_NAME/src/SeleniumChromiumLayer.zip \
+        --sse aws:kms \
+        --sse-kms-key-id $KMS_ARN
+
+        echo "build completed on `date`"
+  post_build:
+    commands:
+      - echo "Running unit tests"
+      - |
+        set -e
+        directory=$PWD
+        cd $directory/NRThreadProfileTriggerApp/src
+        python ./test_nr_thread_profile.py
+
+artifacts:
+  files:
+    - /tmp/timestamp.json
+  discard-paths: yes

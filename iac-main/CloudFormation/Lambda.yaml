@@ -1,0 +1,167 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ec2 security group validation lambda responder
+Parameters:
+  pProduct:
+    Type: String
+    Description: Product Name
+  pBusinessUnit:
+    Type: String
+    Description: Business Unit Name
+  pTimeStamp:
+    Type: String
+  pCodepipelineArtifactBucket:
+    Type: String
+    Description: S3 Artifact Bucket Name
+  pLambdaFunctionName:
+    Type: String
+  pResourceOwner:
+    Type: String
+  pDisbursementCode:
+    Type: String
+  pAPRMID:
+    Type: String
+  pEventName:
+    Type: String
+  pEnvironment:
+    Type: String
+  # pRootDir:
+  #   Type: String
+  #   Description: Root Directory (iac) for the project
+  #   Default: iac
+
+Resources:
+  rLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub LAMBDA-${pLambdaFunctionName}-ROLE
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        -
+          PolicyName: !Sub LAMBDA-${pLambdaFunctionName}-POLICY
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            -
+              Action:
+                - 'logs:CreateLogGroup'
+                - 'logs:CreateLogStream'
+                - 'logs:PutLogEvents'
+              Effect: Allow
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
+            -
+              Action:
+                - 'ec2:CreateNetworkInterface'
+                - 'ec2:DescribeNetworkInterfaces'
+                - 'ec2:DeleteNetworkInterface'
+                - 'sts:AssumeRole'
+              Effect: Allow
+              Resource: "*"
+
+  rSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub Lambda-${pLambdaFunctionName}-Access
+      GroupDescription: 'Group giving lambda-respodner-notifciations access to on-prem email and RocketChat'
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          IpProtocol: "-1"
+      VpcId: "{{resolve:ssm:VPCID:1}}"
+
+  rLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: nr_thread_profile.main
+      Runtime: python3.7
+      Code:
+        S3Bucket: !Sub ${pCodepipelineArtifactBucket}
+        S3Key: !Sub ${pProduct}-${pBusinessUnit}/src/deploy-${pTimeStamp}.zip
+      Layers:
+      - Ref: rSeleniumChromiumLayer
+      FunctionName: !Ref pLambdaFunctionName
+      MemorySize: 1024
+      Timeout: 900
+      Role: !GetAtt rLambdaRole.Arn
+      # Uncomment the following section if your lambda needs to access resource on-prem.  This will run lambda inside of VPC.
+      # VpcConfig:
+      #   SecurityGroupIds:
+      #     - !Ref rSecurityGroup
+      #   SubnetIds:
+      #     - "{{resolve:ssm:PrivateSubnetA:1}}"
+      #     - "{{resolve:ssm:PrivateSubnetB:1}}"
+      #     - "{{resolve:ssm:PrivateSubnetC:1}}"
+      Tags:
+      - Key: DisbursementCode
+        Value: !Ref pDisbursementCode
+      - Key: ResourceOwner
+        Value: !Ref pResourceOwner
+      - Key: APRMID
+        Value: !Ref pAPRMID
+      Environment:
+        Variables:
+            PATH: "/opt/bin:/opt/bin/lib:/opt/python"
+            AWS_ENVIRONMENT: !Ref pEnvironment
+            NR_USER: "{{resolve:secretsmanager:NRAutomation/NewRelicFormLogin:SecretString:username}}"
+            NR_PASSWORD: "{{resolve:secretsmanager:NRAutomation/NewRelicFormLogin:SecretString:password}}"
+            NR_API_KEY: "{{resolve:secretsmanager:NRAutomation/NewRelicAPIKey:SecretString:api-key}}"
+
+  rSeleniumChromiumLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+          - python3.7
+      Content:
+          S3Bucket: !Ref pCodepipelineArtifactBucket
+          S3Key: !Sub '${pProduct}-${pBusinessUnit}/src/SeleniumChromiumLayer.zip'
+      Description: Selenium and Chromium Layer for Python 3.x
+
+  rEventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: !Sub aws.partner/newrelic.com/1092591/${pEventName}
+      EventSourceName: !Sub aws.partner/newrelic.com/1092591/${pEventName}
+      Tags:
+      - Key: DisbursementCode
+        Value: !Ref pDisbursementCode
+      - Key: ResourceOwner
+        Value: !Ref pResourceOwner
+      - Key: APRMID
+        Value: !Ref pAPRMID
+
+  rEventBusRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: 'The rule that routes events from new relic to our lambda alert handler'
+      EventBusName: !GetAtt rEventBus.Name
+      EventPattern:
+        source: [{ "prefix": "aws.partner/newrelic.com" }]
+      Targets: 
+        - Arn: !GetAtt rLambdaFunction.Arn
+          Id: 'NRThreadProfileLambdaTarget'
+
+  rEventLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt rLambdaFunction.Arn
+      Principal: events.amazonaws.com
+      SourceAccount: !Sub ${AWS::AccountId}
+      SourceArn: !GetAtt rEventBusRule.Arn
+
+Outputs:
+  oLambdaFunction:
+    Value: !Ref rLambdaFunction
+    Description: ID of the Rest API created
+  oLambdaARN:
+    Value: !GetAtt rLambdaFunction.Arn
+    Description: Lambda ARN

@@ -1,0 +1,58 @@
+[
+    {
+        "ParameterKey": "pCodePipelineServiceRole",
+        "ParameterValue": "ToolsCDT01-Pipeline-Service-Role-us-east-2"
+    },
+    {
+        "ParameterKey": "pCodePipelineActionRole",
+        "ParameterValue": "NRThreadProfile-CDT01-codepipeline-action-us-east-2"
+    },
+    {
+        "ParameterKey": "pCodePipelineSharedProdActionRole",
+        "ParameterValue": "Universal-Pipeline-Action-Role-us-east-2"
+    },
+    {
+        "ParameterKey": "pProduct",
+        "ParameterValue": "NRThreadProfile"
+    },
+    {
+        "ParameterKey": "pBusinessUnit",
+        "ParameterValue": "CDT01"
+    },
+    {
+        "ParameterKey": "pResourceOwner",
+        "ParameterValue": "conovm2@nationwide.com"
+    },
+    {
+        "ParameterKey": "pDisbursementCode",
+        "ParameterValue": "303513001"
+    },
+    {
+        "ParameterKey": "pRootDir",
+        "ParameterValue": "iac-main"
+    },
+    {
+        "ParameterKey": "pAPRMID",
+        "ParameterValue": "9397"
+    },
+    {
+        "ParameterKey": "pSharedProdAccountNumber",
+        "ParameterValue": "563161085545"
+    },
+    {
+        "ParameterKey": "pDevAccountNumber",
+        "ParameterValue": "850996745251"
+    },
+    {
+        "ParameterKey": "pTestAccountNumber",
+        "ParameterValue": "717989887481"
+    },
+    {
+        "ParameterKey": "pProdAccountNumber",
+        "ParameterValue": "332335801380"
+    },
+    {
+        "ParameterKey": "pToolsAccountNumber",
+        "ParameterValue": "120638066983"
+    }
+]

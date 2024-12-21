@@ -1,0 +1,80 @@
+{ "activated-tag":
+  {
+    "version": "0", "id": "dbd0e7c4-3c1b-4f20-23c8-8c024e04a722", "detail-type": "NewRelicEvent", 
+    "source": "aws.partner/newrelic.com/1092591/StartNewRelicThreadProfile", "account": "850996745251", "time": "2022-10-17T17:19:53Z", 
+    "region": "us-east-2", "resources": [], 
+    "detail": {
+      "id": "2c111856-2829-4235-a26b-85511bf74c08", 
+      "issueUrl": "https://radar-api.service.newrelic.com/accounts/1/issues/0ea2df1c-adab-45d2-aae0-042b609d2322?notifier=SLACK&action=", 
+      "tags.threadProfileAPM": ["DEV_MCC_DPIM-MDM_5777"], 
+      "title": "Monitor failed for location nw_cpm_prod005_01 on 'PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting'", 
+      "priority": "CRITICAL", "impactedEntities": ["PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting"], "totalIncidents": 1, "state": "ACTIVATED", 
+      "trigger": "STATE_CHANGE", "isCorrelated": False, "createdAt": 1666026872359, "updatedAt": 1666026987511, "sources": ["newrelic"], 
+      "alertPolicyNames": ["PROD_CSB_KnowledgeAdvanced_7979:Email"], "alertConditionNames": ["P&C Automated testing failed"], 
+      "workflowName": "DBA Team workflow"
+    }
+  },
+  "activated-notag":
+  {
+    "version": "0", "id": "dbd0e7c4-3c1b-4f20-23c8-8c024e04a722", "detail-type": "NewRelicEvent", 
+    "source": "aws.partner/newrelic.com/1092591/StartNewRelicThreadProfile", "account": "850996745251", "time": "2022-10-17T17:19:53Z", 
+    "region": "us-east-2", "resources": [], 
+    "detail": {
+      "id": "2c111856-2829-4235-a26b-85511bf74c08", 
+      "issueUrl": "https://radar-api.service.newrelic.com/accounts/1/issues/0ea2df1c-adab-45d2-aae0-042b609d2322?notifier=SLACK&action=", 
+      "tags.threadProfileAPM": [""], 
+      "title": "Monitor failed for location nw_cpm_prod005_01 on 'PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting'", 
+      "priority": "CRITICAL", "impactedEntities": ["PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting"], "totalIncidents": 1, "state": "ACTIVATED", 
+      "trigger": "STATE_CHANGE", "isCorrelated": False, "createdAt": 1666026872359, "updatedAt": 1666026987511, "sources": ["newrelic"], 
+      "alertPolicyNames": ["DEV_MCC_DPIM-MDM_5777:Email"], "alertConditionNames": ["P&C Automated testing failed"], 
+      "workflowName": "DBA Team workflow"
+    }
+  },
+  "activated-noAPM":
+  {
+    "version": "0", "id": "dbd0e7c4-3c1b-4f20-23c8-8c024e04a722", "detail-type": "NewRelicEvent", 
+    "source": "aws.partner/newrelic.com/1092591/StartNewRelicThreadProfile", "account": "850996745251", "time": "2022-10-17T17:19:53Z", 
+    "region": "us-east-2", "resources": [], 
+    "detail": {
+      "id": "2c111856-2829-4235-a26b-85511bf74c08", 
+      "issueUrl": "https://radar-api.service.newrelic.com/accounts/1/issues/0ea2df1c-adab-45d2-aae0-042b609d2322?notifier=SLACK&action=", 
+      "tags.threadProfileAPM": [""], 
+      "title": "Monitor failed for location nw_cpm_prod005_01 on 'PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting'", 
+      "priority": "CRITICAL", "impactedEntities": ["PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting"], "totalIncidents": 1, "state": "ACTIVATED", 
+      "trigger": "STATE_CHANGE", "isCorrelated": False, "createdAt": 1666026872359, "updatedAt": 1666026987511, "sources": ["newrelic"], 
+      "alertPolicyNames": ["No-APM-in-this-policy-name"], "alertConditionNames": ["P&C Automated testing failed"], 
+      "workflowName": "DBA Team workflow"
+    }
+  },
+  "closed":
+  {
+    "version": "0", "id": "dbd0e7c4-3c1b-4f20-23c8-8c024e04a722", "detail-type": "NewRelicEvent", 
+    "source": "aws.partner/newrelic.com/1092591/StartNewRelicThreadProfile", "account": "850996745251", "time": "2022-10-17T17:19:53Z", 
+    "region": "us-east-2", "resources": [], 
+    "detail": {
+      "id": "2c111856-2829-4235-a26b-85511bf74c08", 
+      "issueUrl": "https://radar-api.service.newrelic.com/accounts/1/issues/0ea2df1c-adab-45d2-aae0-042b609d2322?notifier=SLACK&action=", 
+      "tags.threadProfileAPM": ["DEV_MCC_DPIM-MDM_5777"], 
+      "title": "Monitor failed for location nw_cpm_prod005_01 on 'PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting'", 
+      "priority": "CRITICAL", "impactedEntities": ["PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting"], "totalIncidents": 1, "state": "CLOSED", 
+      "trigger": "STATE_CHANGE", "isCorrelated": False, "createdAt": 1666026872359, "updatedAt": 1666026987511, "sources": ["newrelic"], 
+      "alertPolicyNames": ["DEV_MCC_DPIM-MDM_5777:Email"], "alertConditionNames": ["P&C Automated testing failed"], 
+      "workflowName": "DBA Team workflow"
+    }
+  },
+  "production-apm":
+  {
+    "version": "0", "id": "dbd0e7c4-3c1b-4f20-23c8-8c024e04a722", "detail-type": "NewRelicEvent", 
+    "source": "aws.partner/newrelic.com/1092591/StartNewRelicThreadProfile", "account": "850996745251", "time": "2022-10-17T17:19:53Z", 
+    "region": "us-east-2", "resources": [], 
+    "detail": {
+      "id": "2c111856-2829-4235-a26b-85511bf74c08", 
+      "issueUrl": "https://radar-api.service.newrelic.com/accounts/1/issues/0ea2df1c-adab-45d2-aae0-042b609d2322?notifier=SLACK&action=", 
+      "title": "Monitor failed for location nw_cpm_prod005_01 on 'PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting'", 
+      "priority": "CRITICAL", "impactedEntities": ["PROD_CSB_KnowledgeAdvanced_7979:AutomatedTesting"], "totalIncidents": 1, "state": "ACTIVATED", 
+      "trigger": "STATE_CHANGE", "isCorrelated": False, "createdAt": 1666026872359, "updatedAt": 1666026987511, "sources": ["newrelic"], 
+      "alertPolicyNames": ["PROD_MCC_DPIM_5777:Email"], "alertConditionNames": ["P&C Automated testing failed"], 
+      "workflowName": "DBA Team workflow"
+    }
+  }
+}
